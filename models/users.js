@@ -41,7 +41,8 @@ const UserSchema = new Schema({
             message: props => `${props.value} is not a valid Password!`
         },
     },
-    token : String
+    token : String,
+    lastLogin:Number,
 })
 
 const User = mongoose.model('User',UserSchema)

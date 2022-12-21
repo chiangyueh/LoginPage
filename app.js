@@ -22,12 +22,16 @@ app.use(express.static('public'))
 app.engine('hbs', exphbs.engine({ defaultLayout: 'main', extname: '.hbs' }))
 app.set('view engine', 'hbs')
 
+app.get('/', (req, res) => {
+    return res.status(302).redirect('/login')
+})
 
 app.post('/registrate', async (req, res) => {
     try {
         let { firstName, email, password } = req.body
+        const date = new Date()
         let hashpassword = await bcrypt.hash(password, saltRounds)
-        let newUser = new User({ firstName, email, password, token: hashpassword })
+        let newUser = new User({ firstName, email, password, token: hashpassword, lastLogin: date.valueOf()})
         await newUser.save()
         return res.redirect('/')
     } catch (e) {
@@ -35,28 +39,41 @@ app.post('/registrate', async (req, res) => {
     }
 })
 
-
 app.get('/login', (req, res) => {
+    const date = new Date()
     const { token } = req.cookies
-    if (token) {
-        return res.render('index')
-    }
-    return res.render('login')
+    User.findOne({token})
+    .then((e)=>{
+        if(e.lastLogin){
+            const anotherDay = (date.valueOf()-e.lastLogin)/1000
+            if(anotherDay > 86400){
+                return res.render('login')
+            }else{
+                return res.render('index')
+            }
+        }else{
+            return res.render('login')
+        }
+    })
 })
 
 app.post('/login/submit', async (req, res) => {
     try {
         let { email, password } = req.body
         User.findOne({ email })
-            .then((e) => {
+            .then(async(e) => {
                 if (e) {
                     if (e.password != password) {
                         return res.render('login', { err: '密碼錯誤' })
                     } else {
+                        let hashpassword = await bcrypt.hash(password, saltRounds)
+                        e.token = hashpassword;
+                        e.lastLogin = new Date().valueOf()
+                        e.save();
                         res.cookie('token', e.token)
                         return res.render('index')
                     }
-                } else{
+                } else {
                     return res.render('login', { err: '信箱錯誤' })
                 }
             })
